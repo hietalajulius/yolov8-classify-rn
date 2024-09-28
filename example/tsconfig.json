@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "yolov8-classify": ["../src/index"],
+      "yolov8-classify/*": ["../src/*"]
+    }
+  }
+}
