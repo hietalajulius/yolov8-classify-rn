@@ -1,11 +1,18 @@
-import { requireNativeViewManager } from 'expo-modules-core';
-import * as React from 'react';
+import { requireNativeViewManager } from "expo-modules-core";
+import * as React from "react";
+import { ViewProps } from "react-native";
 
-import { Yolov8ClassifyViewProps } from './Yolov8Classify.types';
+export type OnResultEvent = {
+  classification: string;
+};
 
-const NativeView: React.ComponentType<Yolov8ClassifyViewProps> =
-  requireNativeViewManager('Yolov8Classify');
+export type Props = {
+  onResult?: (event: { nativeEvent: OnResultEvent }) => void;
+} & ViewProps;
 
-export default function Yolov8ClassifyView(props: Yolov8ClassifyViewProps) {
+const NativeView: React.ComponentType =
+  requireNativeViewManager("Yolov8Classify");
+
+export default function Yolov8ClassifyView(props: Props) {
   return <NativeView {...props} />;
 }

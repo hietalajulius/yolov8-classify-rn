@@ -28,7 +28,6 @@
   "author": "hietalajulius <julius.hietala@gmail.com> (https://github.com/hietalajulius)",
   "license": "MIT",
   "homepage": "https://github.com/hietalajulius/yolov8-classify-rn#readme",
-  "dependencies": {},
   "devDependencies": {
     "@types/react": "^18.0.25",
     "expo-module-scripts": "^3.5.2",

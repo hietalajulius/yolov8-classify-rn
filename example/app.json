@@ -1,5 +1,6 @@
 {
   "expo": {
+    "plugins": [["../app.plugin.js", { "cameraUsageDescription": "Camera used for capturing classification input" }]],
     "name": "yolov8-classify-example",
     "slug": "yolov8-classify-example",
     "version": "1.0.0",

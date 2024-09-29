@@ -1,0 +1,6 @@
+ios/yolov8x-cls.mlmodelc/** filter=lfs diff=lfs merge=lfs -text
+ios/yolov8x-cls.mlmodelc/analytics filter=lfs diff=lfs merge=lfs -text
+ios/yolov8x-cls.mlmodelc/coremldata.bin filter=lfs diff=lfs merge=lfs -text
+ios/yolov8x-cls.mlmodelc/metadata.json filter=lfs diff=lfs merge=lfs -text
+ios/yolov8x-cls.mlmodelc/model.mil filter=lfs diff=lfs merge=lfs -text
+ios/yolov8x-cls.mlmodelc/weights filter=lfs diff=lfs merge=lfs -text
