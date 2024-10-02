@@ -1,5 +1,5 @@
 # React Native CoreML Image Classification App with Expo and YOLOv8
-This repository showcases how to build an Expo module for image classification using YOLOv8 including a simple app to showcase its functionality. This module can be integrated into any Expo or React Native app, making it easy for developers with React and JavaScript experience to add AI capabilities to their projects.
+This repository showcases how to build an Expo module for image classification using YOLOv8 including a simple app to showcase its functionality. This module can be integrated into any Expo or React Native app, making it easy for developers with React and JavaScript experience to add AI capabilities to their projects. You can find the blog post about the project [here](https://hietalajulius.medium.com/building-a-react-native-coreml-image-classification-app-with-expo-and-yolov8-a083c7866e85).
 <div align="center">
   <img src="https://github.com/user-attachments/assets/d662ee41-46f5-4956-bbd9-b787fef926d5" height="1000">
 </div>
@@ -15,3 +15,4 @@ Make sure you have [Node.js](https://nodejs.org/en) installed on your system
 
 ## Running
 To run the example app, run `cd example && npx expo run:ios --device` (you need to connect your iPhone via USB to be able to select it)
+
