@@ -1,6 +1,13 @@
 {
   "expo": {
-    "plugins": [["../app.plugin.js", { "cameraUsageDescription": "Camera used for capturing classification input" }]],
+    "plugins": [
+      [
+        "../app.plugin.js",
+        {
+          "cameraUsageDescription": "Camera used for capturing classification input"
+        }
+      ]
+    ],
     "name": "yolov8-classify-example",
     "slug": "yolov8-classify-example",
     "version": "1.0.0",
@@ -9,8 +16,8 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "cover",
+      "backgroundColor": "#f0f0f0"
     },
     "ios": {
       "supportsTablet": true,

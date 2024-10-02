@@ -4,10 +4,21 @@ import WebKit
 import UIKit
 import AVFoundation
 
+enum Yolov8ClassifyViewError: Error {
+    case mlModelNotFound
+    case mlModelLoadingFailed(Error)
+    case videoDeviceInputCreationFailed
+    case cannotAddVideoInput
+    case cannotAddVideoOutput
+    case failedToLockVideoDevice(Error)
+    case pixelBufferUnavailable
+    case requestProcessingFailed(Error)
+}
+
 class Yolov8ClassifyView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate {
-    private var previewView = UIView()
-    private let onResult = EventDispatcher()
+    private let previewView = UIView()
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private let onResult = EventDispatcher()
     private let session = AVCaptureSession()
     private var bufferSize: CGSize = .zero
     private var requests = [VNRequest]()
@@ -18,42 +29,97 @@ class Yolov8ClassifyView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     }
 
     private func setupCaptureSession() {
-        setupCapture()
-        setupOutput()
-        setupVision()
-        setupPreviewLayer()
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.startRunning()
+        do {
+            try setupCapture()
+            try setupOutput()
+            try setupVision()
+            setupPreviewLayer()
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.session.startRunning()
+            }
+        } catch {
+            print("Error setting up capture session: \(error)")
         }
     }
 
-    private func setupPreviewLayer() {
-        previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer?.videoGravity = .resizeAspectFill
-        previewView.layer.addSublayer(previewLayer!)
-        addSubview(previewView)
+    private func setupCapture() throws {
+        guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              let deviceInput = try? AVCaptureDeviceInput(device: videoDevice) else {
+            throw Yolov8ClassifyViewError.videoDeviceInputCreationFailed
+        }
+
+        session.beginConfiguration()
+
+        guard session.canAddInput(deviceInput) else {
+            throw Yolov8ClassifyViewError.cannotAddVideoInput
+        }
+
+        session.addInput(deviceInput)
+        setupBufferSize(for: videoDevice)
+        session.commitConfiguration()
     }
 
-    private func setupVision() {
-        guard let modelURL = Bundle.main.url(forResource: "yolov8x-cls", withExtension: "mlmodelc") else {
-            fatalError("Failed to find ML model.")
+    private func setupOutput() throws {
+        let videoDataOutput = AVCaptureVideoDataOutput()
+        let videoDataOutputQueue = DispatchQueue(
+            label: "VideoDataOutput",
+            qos: .userInitiated,
+            attributes: [],
+            autoreleaseFrequency: .workItem
+        )
+
+        guard session.canAddOutput(videoDataOutput) else {
+            throw Yolov8ClassifyViewError.cannotAddVideoOutput
+        }
+
+        session.addOutput(videoDataOutput)
+        videoDataOutput.alwaysDiscardsLateVideoFrames = true
+        videoDataOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String:
+            Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+        ]
+        videoDataOutput.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
+    }
+
+    private func setupVision() throws {
+        guard let modelURL = Bundle.main.url(
+            forResource: "yolov8x-cls",
+            withExtension: "mlmodelc"
+        ) else {
+            throw Yolov8ClassifyViewError.mlModelNotFound
         }
 
         do {
             let visionModel = try VNCoreMLModel(for: MLModel(contentsOf: modelURL))
-            let classification = VNCoreMLRequest(model: visionModel, completionHandler: handleClassification)
-            self.requests = [classification]
+            let classificationRequest = VNCoreMLRequest(
+                model: visionModel,
+                completionHandler: handleClassification
+            )
+            self.requests = [classificationRequest]
         } catch {
-            fatalError("Model loading went wrong: \(error)")
+            throw Yolov8ClassifyViewError.mlModelLoadingFailed(error)
         }
     }
 
-    private func handleClassification(request: VNRequest, error: Error?) {
-        DispatchQueue.main.async { [weak self] in
-            if let results = request.results as? [VNClassificationObservation],
-               let topResult = results.sorted(by: { $0.confidence > $1.confidence }).first {
-                self?.onResult(["classification": topResult.identifier])
-            }
+    private func setupPreviewLayer() {
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        previewLayer = layer
+        previewView.layer.addSublayer(layer)
+        addSubview(previewView)
+    }
+
+    private func setupBufferSize(for videoDevice: AVCaptureDevice) {
+        do {
+            try videoDevice.lockForConfiguration()
+            let dimensions = CMVideoFormatDescriptionGetDimensions(
+                videoDevice.activeFormat.formatDescription
+            )
+            bufferSize.width = CGFloat(dimensions.width)
+            bufferSize.height = CGFloat(dimensions.height)
+            videoDevice.unlockForConfiguration()
+        } catch {
+            print("Failed to lock video device for configuration: \(error)")
         }
     }
 
@@ -63,60 +129,34 @@ class Yolov8ClassifyView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
         previewLayer?.frame = previewView.bounds
     }
 
-    private func setupCapture() {
-        guard let videoDevice = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: .back).devices.first,
-              let deviceInput = try? AVCaptureDeviceInput(device: videoDevice) else {
-            fatalError("Could not create video device input.")
-        }
-
-        session.beginConfiguration()
-        session.sessionPreset = .vga640x480
-
-        guard session.canAddInput(deviceInput) else {
-            fatalError("Could not add video device input to the session.")
-        }
-
-        session.addInput(deviceInput)
-        setupBufferSize(for: videoDevice)
-        session.commitConfiguration()
-    }
-
-    private func setupBufferSize(for videoDevice: AVCaptureDevice) {
-        do {
-            try videoDevice.lockForConfiguration()
-            let dimensions = CMVideoFormatDescriptionGetDimensions(videoDevice.activeFormat.formatDescription)
-            bufferSize.width = CGFloat(dimensions.width)
-            bufferSize.height = CGFloat(dimensions.height)
-            videoDevice.unlockForConfiguration()
-        } catch {
-            fatalError("\(error)")
+    private func handleClassification(request: VNRequest, error: Error?) {
+        if let results = request.results as? [VNClassificationObservation],
+           let topResult = results.max(by: { $0.confidence < $1.confidence }) {
+            DispatchQueue.main.async { [weak self] in
+                self?.onResult(["classification": topResult.identifier])
+            }
         }
     }
 
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            fatalError("Could not get image buffer from sample buffer.")
+            print("Could not get image buffer from sample buffer.")
+            return
         }
 
-        let imageRequestHandler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
+        let imageRequestHandler = VNImageRequestHandler(
+            cvPixelBuffer: pixelBuffer,
+            orientation: .right,
+            options: [:]
+        )
         do {
             try imageRequestHandler.perform(self.requests)
         } catch {
-            fatalError("\(error)")
+            print("Failed to perform image request: \(error)")
         }
-    }
-
-    private func setupOutput() {
-        let videoDataOutput = AVCaptureVideoDataOutput()
-        let videoDataOutputQueue = DispatchQueue(label: "VideoDataOutput", qos: .userInitiated, attributes: [], autoreleaseFrequency: .workItem)
-
-        guard session.canAddOutput(videoDataOutput) else {
-            fatalError("Could not add video data output to the session.")
-        }
-
-        session.addOutput(videoDataOutput)
-        videoDataOutput.alwaysDiscardsLateVideoFrames = true
-        videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)]
-        videoDataOutput.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
     }
 }
